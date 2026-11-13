@@ -1,0 +1,11 @@
+{
+  "vertices": [
+    "Algorithmique",
+    "Bases de données",
+    "Systèmes d'exploitation",
+    "Mathématiques",
+    "Réseaux",
+    "Intelligence artificielle"
+  ],
+  "meaning": "Une arête relie deux examens qui partagent au moins un étudiant. Une couleur représente un créneau."
+}

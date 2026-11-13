@@ -1,0 +1,42 @@
+# Compiled artifacts
+build/
+*.exe
+*.o
+*.obj
+*.out
+
+# Generated graph families: keep the compact, deterministic live-demo input.
+data/generated/*
+!data/generated/exact/
+data/generated/exact/*
+!data/generated/exact/g20.txt
+
+# Temporary traces, logs and rendering previews
+results/tmp/
+tmp/
+.codex-build/
+*.log
+*.trace
+*.tmp
+*.tmp.*
+results/slides/
+results/report_render*/
+results/rapport_render*/
+
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+
+# Operating system and IDE clutter
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+.vs/
+*.swp
+*.swo

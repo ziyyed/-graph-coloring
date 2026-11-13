@@ -1,0 +1,38 @@
+[
+  {
+    "name": "G20",
+    "n": 20,
+    "m": 91,
+    "density": 0.4789473684210526,
+    "chromatic_number": 5,
+    "calibration_wall_seconds": 0.023728699999999492,
+    "path": "data\\generated\\exact\\g20.txt"
+  },
+  {
+    "name": "G24",
+    "n": 24,
+    "m": 131,
+    "density": 0.4746376811594203,
+    "chromatic_number": 6,
+    "calibration_wall_seconds": 0.10259409999999747,
+    "path": "data\\generated\\exact\\g24.txt"
+  },
+  {
+    "name": "G30",
+    "n": 30,
+    "m": 206,
+    "density": 0.4735632183908046,
+    "chromatic_number": 7,
+    "calibration_wall_seconds": 9.344956,
+    "path": "data\\generated\\exact\\g30.txt"
+  },
+  {
+    "name": "G36",
+    "n": 36,
+    "m": 293,
+    "density": 0.4650793650793651,
+    "chromatic_number": 7,
+    "calibration_wall_seconds": 10.061081999999999,
+    "path": "data\\generated\\exact\\g36.txt"
+  }
+]
