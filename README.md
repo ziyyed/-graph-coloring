@@ -1,89 +1,214 @@
 # Coloriage de graphes
+### Projet C11 · OpenMP · complexité algorithmique
 
-Projet universitaire en C11 et OpenMP : deux stratégies de coloriage de graphes, leurs versions parallèles, une analyse de complexité et des mesures reproductibles. Le graphe de démonstration G20 est présent et exempté du `.gitignore`. Les grandes entrées de benchmark sont générées localement par `python scripts/generate_graphs.py`.
+![C11](https://img.shields.io/badge/C-C11-00599C?logo=c&logoColor=white)
+![OpenMP](https://img.shields.io/badge/parallelisme-OpenMP-6EA94E)
+![GCC](https://img.shields.io/badge/compilateur-GCC-A42E2B?logo=gnu&logoColor=white)
+![Python](https://img.shields.io/badge/outils-Python_3-3776AB?logo=python&logoColor=white)
+
+**Équipe : Zied Chouk · Chayma Hakouna · Wirak**
+
+Projet universitaire qui compare quatre façons de colorier un graphe : glouton séquentiel et OpenMP, recherche exacte séquentielle et OpenMP. Le dépôt contient le code C, les entrées, les mesures, les figures et les livrables.
+
+> Le glouton trouve rapidement une coloration valide et fournit une borne supérieure. Le backtracking essaie les nombres de couleurs croissants et certifie le nombre chromatique.
+
+## Parcours du dépôt
+
+```mermaid
+flowchart LR
+    G["scripts/generate_graphs.py"] --> D["data/ · matrices d'adjacence"]
+    D --> C["src/coloring.c · solveur C11"]
+    C -->|4 modes · JSON| B["scripts/benchmark.py"]
+    B --> R["results/ · CSV de mesures"]
+    R --> P["scripts/plot_results.py"]
+    P --> F["results/figures/ · graphiques"]
+    R --> DOCS["scripts/create_report.py"]
+    F --> DOCS
+    DOCS --> DOC["rapport DOCX puis PDF"]
+    F --> A["scripts/artifact_deck.mjs"]
+    A --> PPT["présentation PPTX · 17 diapositives"]
+```
+
+## Aperçu des résultats
+
+Le cycle impair C5 a besoin de trois couleurs. La figure montre une coloration propre qui atteint cette borne :
+
+![Cycle C5 colorié avec trois couleurs](results/figures/cycle5_colore.png)
+
+Le même modèle transforme les conflits entre examens en créneaux compatibles :
+
+![Exemple d'emploi du temps colorié](results/figures/exam_schedule.png)
+
+Pour comprendre pourquoi deux couleurs échouent sur C₅, l’arbre réduit montre les deux branches possibles et l’impasse au cinquième sommet :
+
+![Arbre de backtracking de C5 avec deux couleurs](results/figures/arbre_backtracking_c5_k2.png)
+
+L'accélération du backtracking compare le temps séquentiel au temps OpenMP selon le nombre de threads p :
+
+![Accélération du solveur exact](results/figures/speedup_exact.png)
+
+La trace Gantt est produite séparément des mesures chronométrées :
+
+![Répartition des tâches sur quatre threads](results/figures/gantt_4threads.png)
 
 ## Démarrage rapide
 
-Prérequis : GCC avec OpenMP (`gcc -fopenmp`) et Python 3. Le programme C ne dépend d'aucune bibliothèque tierce. Pour les graphiques et la génération du rapport, installez les bibliothèques Python utilisées par les scripts :
+### Prérequis
+
+- GCC avec OpenMP. Sous Windows, installez un GCC MinGW-w64 (par exemple MSYS2) avec son dossier bin dans PATH. WSL peut suivre les commandes Linux.
+- Git pour cloner le dépôt.
+- Python 3 pour les tests, benchmarks, figures et rapport.
+- Les bibliothèques utilisées pour les figures et le rapport :
 
 ```bash
 python -m pip install matplotlib python-docx Pillow
 ```
 
-Le générateur JavaScript alternatif `scripts/plot_results.mjs` demande Node.js et le paquet `sharp` (`npm install --no-save --package-lock=false sharp`). Les tracés Python sont la voie recommandée et n'ont pas besoin de Node.js.
+Le solveur C n'utilise pas de bibliothèque tierce hors runtime OpenMP de GCC. Le générateur JavaScript facultatif scripts/plot_results.mjs requiert Node.js et sharp : npm install --no-save --package-lock=false sharp.
 
-### Windows PowerShell
+### 1. Vérifier GCC et OpenMP
+
+```text
+gcc --version
+```
+
+La compilation avec -fopenmp à l'étape suivante valide aussi l'activation et l'édition de liens OpenMP. En cas de message « unrecognized command-line option » ou « cannot find -lgomp », installez une distribution GCC avec OpenMP.
+
+### 2. Compiler
+
+#### Windows PowerShell
 
 ```powershell
 New-Item -ItemType Directory -Force build | Out-Null
-gcc -std=c11 -O2 -Wall -Wextra -Wpedantic -fopenmp src/coloring.c -o build/coloring.exe -fopenmp
-.\build\coloring.exe data\examples\cycle5.txt exact-seq
+gcc -O2 -std=c11 -Wall -Wextra -Wpedantic -fopenmp src/coloring.c -o build/coloring.exe -fopenmp
 ```
 
-### Linux
+#### Windows CMD
+
+```bat
+if not exist build mkdir build
+gcc -O2 -std=c11 -Wall -Wextra -Wpedantic -fopenmp src/coloring.c -o build\coloring.exe -fopenmp
+```
+
+#### Linux / WSL
 
 ```bash
 mkdir -p build
-gcc -std=c11 -O2 -Wall -Wextra -Wpedantic -fopenmp src/coloring.c -o build/coloring -fopenmp
+gcc -O2 -std=c11 -Wall -Wextra -Wpedantic -fopenmp src/coloring.c -o build/coloring -fopenmp
+```
+
+- -std=c11 sélectionne C11, -O2 active l'optimisation et -fopenmp active OpenMP.
+- Les autres options demandent à GCC d'afficher des avertissements utiles.
+- Le binaire reste dans build/, ignoré par Git.
+
+### 3. Démonstration jury en moins de 90 secondes
+
+Compilez avant la soutenance. G20 est inclus dans Git : aucune génération de données n'est requise. Lancez les trois résolutions dans cet ordre.
+
+**PowerShell :**
+
+```powershell
+.\build\coloring.exe data\examples\cycle5.txt exact-seq
+.\build\coloring.exe data\generated\exact\g20.txt exact-seq --warmup 1 --repeat 3 --batch 10
+.\build\coloring.exe data\generated\exact\g20.txt exact-omp --threads 4 --task-depth 4 --warmup 1 --repeat 3 --batch 10
+```
+
+**Windows CMD :**
+
+```bat
+build\coloring.exe data\examples\cycle5.txt exact-seq
+build\coloring.exe data\generated\exact\g20.txt exact-seq --warmup 1 --repeat 3 --batch 10
+build\coloring.exe data\generated\exact\g20.txt exact-omp --threads 4 --task-depth 4 --warmup 1 --repeat 3 --batch 10
+```
+
+**Linux / WSL :**
+
+```bash
 ./build/coloring data/examples/cycle5.txt exact-seq
+./build/coloring data/generated/exact/g20.txt exact-seq --warmup 1 --repeat 3 --batch 10
+./build/coloring data/generated/exact/g20.txt exact-omp --threads 4 --task-depth 4 --warmup 1 --repeat 3 --batch 10
 ```
 
-La commande sur `cycle5.txt` doit afficher une solution valide avec `chromatic_number: 3`. Pour vérifier G20 sans générer les autres graphes :
+Le programme émet un objet JSON par commande. Vérifiez ces champs dans la sortie complète :
 
-```text
-Windows : .\build\coloring.exe data\generated\exact\g20.txt exact-seq
-Linux   : ./build/coloring data/generated/exact/g20.txt exact-seq
-```
-
-Les fichiers G12 à G36 et les graphes gloutons G1000 à G12000 sont ignorés par Git. Pour les (re)créer, lancez `python scripts/generate_graphs.py`.
-
-## Modes et options
-
-```text
-PROGRAMME FICHIER_GRAPHE MODE [options]
-```
-
-| Mode | Fonction |
+| Cas | Valeurs attendues |
 | --- | --- |
-| `greedy-seq` | Coloration gloutonne séquentielle, dans l'ordre des sommets du fichier. |
-| `greedy-omp` | Même ordre déterministe; le balayage des voisins est parallèle. |
-| `exact-seq` | Recherche séquentielle par retour sur trace du nombre chromatique. |
-| `exact-omp` | Recherche exacte avec tâches OpenMP et espaces de couleurs privés par branche. |
+| C5 séquentiel | vertices=5, edges=5, chromatic_number=3, solution_valid=true, couleurs=[1,2,1,2,3] |
+| G20 séquentiel | vertices=20, edges=91, chromatic_number=5, solution_valid=true |
+| G20 OpenMP | chromatic_number=5, solution_valid=true, threads=4, task_depth=4 |
 
-| Option | Valeurs et effet |
-| --- | --- |
-| `--threads N` | 1 à 256, défaut 1. Nombre de threads OpenMP. |
-| `--task-depth N` | 1 à 4, défaut 4. Profondeur jusqu'à laquelle `exact-omp` crée des tâches. |
-| `--k K` | Entier positif. En mode exact, demande si le graphe est coloriable avec au plus K couleurs. |
-| `--warmup N` | 0 à 20, défaut 0. Résolutions d'échauffement exclues des temps affichés. |
-| `--repeat N` | 1 à 100, défaut 1. Nombre de répétitions chronométrées. |
-| `--batch N` | 1 à 1 000 000, défaut 1. Résolutions par lot; le temps du lot est divisé par N. |
-| `--gantt CSV` | Écrit la trace Gantt d'une résolution `exact-omp`; incompatible avec `--k`. Le traçage est séparé des mesures. |
+Les temps de référence archivés pour G20 sont environ 6,76 ms en séquentiel et 1,66 ms à quatre threads. Les temps en direct dépendent de la machine et de sa charge. Le résultat de correction doit rester le même.
 
-Exemples des quatre modes :
+Voici le format JSON et les champs à repérer. L’ordre des couleurs peut varier entre les exécutions exactes parallèles; elles doivent toujours décrire une coloration valide de 5 couleurs. Les durées sont des exemples et ne sont pas des objectifs à garantir.
 
-```text
-Windows : .\build\coloring.exe data\examples\cycle5.txt greedy-seq
-Windows : .\build\coloring.exe data\examples\cycle5.txt greedy-omp --threads 4
-Windows : .\build\coloring.exe data\examples\cycle5.txt exact-seq --k 2
-Windows : .\build\coloring.exe data\examples\cycle5.txt exact-omp --threads 4 --task-depth 4
-Linux   : ./build/coloring data/examples/cycle5.txt greedy-seq
-Linux   : ./build/coloring data/examples/cycle5.txt greedy-omp --threads 4
-Linux   : ./build/coloring data/examples/cycle5.txt exact-seq --k 2
-Linux   : ./build/coloring data/examples/cycle5.txt exact-omp --threads 4 --task-depth 4
+```json
+{"mode":"exact-seq","vertices":5,"edges":5,"chromatic_number":3,"solution_valid":true,"colors":[1,2,1,2,3],"seconds":[0.000000000],"threads":1,"task_depth":4,"batch":1}
+{"mode":"exact-seq","vertices":20,"edges":91,"chromatic_number":5,"solution_valid":true,"colors":[1,2,3,4,3,4,1,3,3,4,4,1,5,2,3,5,2,1,5,2],"seconds":[0.005099988,0.006299996,0.006400013],"threads":1,"task_depth":4,"batch":10}
+{"mode":"exact-omp","vertices":20,"edges":91,"chromatic_number":5,"solution_valid":true,"colors":[2,5,4,3,4,3,2,4,4,3,3,2,1,5,4,1,5,2,1,5],"seconds":[0.000000000,0.001600003,0.001600003],"threads":4,"task_depth":4,"batch":10}
 ```
 
-Le chargeur attend `n`, puis exactement `n²` valeurs `0` ou `1`. Les espaces et retours à la ligne peuvent séparer les valeurs. Il rejette les matrices asymétriques, les diagonales non nulles, les valeurs invalides et les données après la matrice. Le graphe vide s'écrit avec un unique `0`. Chaque résolution imprime un objet JSON avec les caractéristiques du graphe, la coloration, sa validité et les temps.
+Les deux lignes G20 sont un exemple capturé sur la machine de préparation. Les champs `colors` et `seconds` sont sensibles à l’ordonnancement et à la machine; les valeurs à comparer sont notamment `vertices`, `edges`, `chromatic_number` et `solution_valid`.
 
-## Tests et benchmarks
+## Le modèle en une minute
 
-Après compilation, les tests fonctionnels se lancent avec :
+Un graphe non orienté est G=(V,E). Un sommet représente un objet, une arête représente une incompatibilité et une couleur représente une ressource ou un créneau. Une coloration propre attribue des couleurs différentes aux extrémités de chaque arête. Le nombre chromatique χ(G) est le minimum de couleurs requis.
+
+- greedy-seq et greedy-omp produisent une coloration propre dans l'ordre des sommets du fichier. Leur nombre de couleurs est une borne supérieure de χ(G), pas une preuve de minimalité.
+- exact-seq et exact-omp essaient K=1,2,… jusqu'à la première coloration valide. Le premier succès certifie χ(G).
+- Avec une matrice, chaque algorithme balaie jusqu'à n cases pour chacun des n sommets. Le glouton est donc Θ(n²), même si m=0.
+- La décision « le graphe est-il 3-coloriable ? » est NP-complète en général. Le backtracking peut avoir un arbre exponentiel; il vise ici des graphes de taille modérée.
+
+## Interface en ligne de commande
+
+Syntaxe : PROGRAMME FICHIER_GRAPHE MODE [options]. Le fichier commence par n puis contient exactement n² chiffres 0 ou 1, séparés par des espaces ou retours à la ligne. La matrice doit être symétrique et sa diagonale nulle. Le graphe vide est représenté par un fichier contenant 0.
+
+| Mode ou option | Valeurs / défaut | Effet et exemple |
+| --- | --- | --- |
+| `greedy-seq` | Mode requis | Glouton séquentiel dans l'ordre d'entrée. Exemple : `build/coloring.exe data/examples/cycle5.txt greedy-seq`. |
+| `greedy-omp` | Mode requis | Même ordre des sommets; parallélise le balayage d’une ligne. Exemple : `greedy-omp --threads 4`. |
+| `exact-seq` | Mode requis | Recherche séquentielle exacte du nombre chromatique. Exemple : `exact-seq`. |
+| `exact-omp` | Mode requis | Recherche exacte avec tâches OpenMP. Exemple : `exact-omp --threads 4 --task-depth 4`. |
+| `--threads N` | 1–256, défaut 1 | Équipe OpenMP demandée; utile aux modes `*-omp`. Exemple : `--threads 4`. |
+| `--task-depth N` | 1–4, défaut 4 | Profondeur maximale de création de tâches pour `exact-omp`; les branches au-delà continuent récursivement. Exemple : `--task-depth 2`. |
+| `--k K` | Entier positif, sans défaut | Modes exacts seulement : décide si le graphe est coloriable en au plus K couleurs. Exemple : `exact-seq --k 2`. |
+| `--warmup N` | 0–20, défaut 0 | Nombre de lots d’échauffement non chronométrés. Exemple : `--warmup 1`. |
+| `--repeat N` | 1–100, défaut 1 | Nombre de mesures; `seconds` contient une durée moyenne par résolution pour chaque répétition. Exemple : `--repeat 5`. |
+| `--batch N` | 1–1 000 000, défaut 1 | Résolutions dans chaque mesure; la durée totale est divisée par N. Exemple : `--batch 10`. |
+| `--gantt CSV` | Sans défaut | Écrit une trace séparée avec `exact-omp`; interdit avec `--k`. Exemple : `--gantt results/gantt_4threads.csv`. |
+
+**Attention aux noms exacts :** le code reconnaît `--gantt`, pas `--trace-gantt`. Il n’existe pas de drapeau `--help`; si les arguments manquent ou sont invalides, le programme affiche son usage sur stderr.
+
+### Exemple de décision
+
+C5 est impossible à colorier avec deux couleurs :
+
+```bash
+./build/coloring data/examples/cycle5.txt exact-seq --k 2
+```
+
+La réponse comprend colorable=false. Avec un K faisable, le JSON contient colorable=true et les couleurs correspondantes. En mode glouton, le champ JSON chromatic_number contient seulement le nombre de couleurs utilisées par l'heuristique; ne le présentez pas comme un optimum certifié.
+
+### Lire la sortie JSON
+
+- mode, vertices et edges décrivent l'exécution.
+- Pour une recherche exacte du minimum, chromatic_number est optimal. Pour le glouton, c'est le nombre de couleurs de sa solution.
+- En mode --k, l'information de décision apparaît dans k, colorable, solution_valid et colors.
+- seconds contient une durée moyenne par résolution, en secondes; quand batch > 1, le temps du lot est divisé par batch.
+- threads, task_depth et batch rappellent les paramètres.
+
+Les erreurs vont sur stderr et s'accompagnent d'un code de retour non nul.
+
+## Tests et expériences
+
+Après compilation, exécutez les tests de correction :
 
 ```bash
 python tests/test_color.py
 ```
 
-Le générateur produit des graphes symétriques à graine fixe : exacts de densité cible 0,45 et gloutons de densité cible 0,10. Le benchmark séquentiel calibre les tailles exactes, puis mesure les mêmes instances avec 1, 2, 4 et 8 threads :
+Les tests couvrent notamment le graphe vide, un singleton, un graphe sans arêtes, les bipartis, les cycles impairs, les graphes complets et les graphes déconnectés. Ils comparent aussi les versions séquentielles et OpenMP.
+
+Le générateur produit les familles déterministes, puis le benchmark calibre les graphes exacts et mesure les mêmes instances avec 1, 2, 4 et 8 threads :
 
 ```bash
 python scripts/generate_graphs.py
@@ -91,52 +216,105 @@ python scripts/benchmark.py
 python scripts/plot_results.py
 ```
 
-`scripts/benchmark.py` sélectionne les quatre plus grandes instances exactes dont la calibration séquentielle prend moins de 60 secondes. Il écrit `results/raw_measurements.csv`, `results/performance_summary.csv` et `results/exact_selection.json`. Le tracé relit les CSV existants et ne relance pas les mesures. Les figures et CSV de résultats restent suivis par Git.
+Le pilote retient les quatre plus grandes tailles exactes résolues sous 60 secondes. Les mesures brutes sont écrites dans results/raw_measurements.csv; les moyennes, écarts-types, speedup et efficacité sont dans results/performance_summary.csv. Cette campagne peut prendre plusieurs minutes.
 
-Pour créer une trace Gantt, utilisez le graphe exact le plus grand indiqué dans `results/exact_selection.json` (G36 avec les données présentes) :
+Pour régénérer les figures à partir des CSV déjà disponibles, sans refaire les mesures, exécutez seulement :
 
-```text
-Windows : .\build\coloring.exe data\generated\exact\g36.txt exact-omp --threads 2 --task-depth 2 --gantt results\gantt_2threads.csv
-Linux   : ./build/coloring data/generated/exact/g36.txt exact-omp --threads 2 --task-depth 2 --gantt results/gantt_2threads.csv
+```bash
+python scripts/plot_results.py
 ```
 
-Répétez avec `--threads 4` et `results/gantt_4threads.csv`, puis lancez `python scripts/plot_results.py`. Sous Windows, `scripts/run_all.ps1` automatise la compilation, les tests, la génération, les benchmarks, les traces et les figures. Cette procédure complète peut prendre plusieurs minutes, en particulier pendant la calibration exacte.
+Les commandes de traçage Gantt après génération de G36 sont :
 
-Pour le G20 de démonstration en direct, ces commandes bornent les mesures sans régénération :
-
-```text
-Windows : .\build\coloring.exe data\generated\exact\g20.txt exact-seq --warmup 1 --repeat 3 --batch 10
-Windows : .\build\coloring.exe data\generated\exact\g20.txt exact-omp --threads 4 --task-depth 4 --warmup 1 --repeat 3 --batch 10
-Linux   : ./build/coloring data/generated/exact/g20.txt exact-seq --warmup 1 --repeat 3 --batch 10
-Linux   : ./build/coloring data/generated/exact/g20.txt exact-omp --threads 4 --task-depth 4 --warmup 1 --repeat 3 --batch 10
+```powershell
+.\build\coloring.exe data\generated\exact\g36.txt exact-omp --threads 2 --task-depth 2 --gantt results\gantt_2threads.csv
+.\build\coloring.exe data\generated\exact\g36.txt exact-omp --threads 4 --task-depth 2 --gantt results\gantt_4threads.csv
+python scripts/plot_results.py
 ```
 
-Les mesures déjà enregistrées pour G20 sont proches de 6,76 ms en séquentiel et 1,66 ms pour OpenMP à quatre threads. Les durées d'un essai en direct varient selon la machine et la charge du système.
+Le traçage lance une résolution séparée après la mesure. La variante Gantt utilise une profondeur de tâches 2 pour tracer les sous-arbres feuilles, sans ajouter l'instrumentation aux temps de performance.
 
-## Organisation du dépôt
+## Refaire les livrables
 
-| Chemin | Contenu |
-| --- | --- |
-| `src/coloring.c` | Chargeur et validation, colorations gloutonnes, recherche exacte séquentielle/parallèle, interface CLI et JSON. |
-| `data/examples/` | C5, exemple d'emploi du temps et étiquettes de cours. |
-| `data/generated/exact/g20.txt` | Graphe G20 déterministe conservé dans Git pour la démonstration. |
-| `data/generated/` | Autres graphes et manifeste de génération, recréés localement et ignorés par Git. |
-| `scripts/build.ps1`, `Makefile` | Compilation Windows et compilation avec GNU Make selon le système. |
-| `scripts/generate_graphs.py` | Génération des entrées de benchmark à graines fixes. |
-| `scripts/benchmark.py` | Calibration, mesures répétées, speedup et efficacité. |
-| `scripts/plot_results.py`, `scripts/plot_results.mjs` | Graphiques depuis les mesures CSV existantes. |
-| `scripts/create_report.py` | Génération du rapport DOCX et de ses tableaux et figures. Requiert `python-docx` et Matplotlib. |
-| `scripts/artifact_deck.mjs` | Source d'édition de la présentation modifiable de 17 diapositives. |
-| `scripts/set_pptx_metadata.py` | Règle les propriétés auteur, titre et sujet d'un PPTX exporté. |
-| `tests/test_color.py` | Tests de validation et de correction sur des graphes connus. |
-| `results/*.csv`, `results/figures/` | Mesures reproductibles, événements Gantt et figures suivis par Git. |
-| `rapport_coloriage_graphes.docx` | Rapport éditable. |
-| `deliverables/rapport_coloriage_graphes.pdf` | Rapport PDF final. |
-| `deliverables/presentation_coloriage_graphes.pptx` | Présentation PowerPoint modifiable. |
-| `GUIDE_SOUTENANCE_EQUIPE.md` | Répartition d'équipe, explication du code, Q&R et déroulé de démonstration. |
+- **Rapport DOCX :** installez les dépendances Python et régénérez les figures à partir des CSV. Exportez ensuite les diapositives 3 et 10 de la présentation en PNG vers `results/slides/slide-03.png` et `results/slides/slide-10.png`, puis générez le rapport :
 
-Après un nouvel export PowerPoint, réglez les propriétés auteur et sujet avec `python scripts/set_pptx_metadata.py deliverables/presentation_coloriage_graphes.pptx`. La source `scripts/artifact_deck.mjs` est destinée à l'édition dans la session Artifact du projet; le PPTX exporté reste directement modifiable dans PowerPoint ou LibreOffice Impress.
+  ```bash
+  python scripts/plot_results.py
+  python scripts/create_report.py
+  ```
 
-## Rappels de complexité
+  `create_report.py` écrit `rapport_coloriage_graphes.docx` à la racine. Pour remplacer le PDF livré, exportez ce DOCX en PDF avec votre éditeur de documents et placez le résultat dans `deliverables/rapport_coloriage_graphes.pdf`.
+- **Présentation PPTX :** le deck de 17 diapositives est défini par `scripts/artifact_deck.mjs` dans la session Artifact du projet; ce fichier n’est pas un exporteur local autonome. Ouvrez la source dans cette session, exportez le PPTX vers `deliverables/presentation_coloriage_graphes.pptx`, puis appliquez les métadonnées :
 
-Avec la matrice d'adjacence, le glouton lit n cases pour chacun des n sommets : son temps est Θ(n²) au meilleur, au moyen et au pire cas, même quand m=0. Pour la décision exacte à K couleurs, la récursion descend jusqu'à n niveaux, chaque niveau essaie au plus K couleurs et chaque contrôle peut balayer n colonnes; le pire cas est O(nKⁿ). Le nombre chromatique est recherché en essayant les K croissants jusqu'à une solution, avec le nombre de couleurs glouton comme borne supérieure. Les moyennes empiriques dépendent des instances et de la distribution génératrice décrites ci-dessus.
+  ```bash
+  python scripts/set_pptx_metadata.py deliverables/presentation_coloriage_graphes.pptx
+  ```
+
+## Carte des fichiers suivis
+
+```text
+.
+├── .gitignore                                  # Binaries, caches, traces et graphes volumineux ignorés
+├── GUIDE_SOUTENANCE_EQUIPE.md                 # Cours visuel et playbook de défense
+├── Makefile                                    # Compilation et raccourcis make test/graphs/benchmark
+├── README.md                                   # Présente le projet et les commandes de démarrage
+├── rapport_coloriage_graphes.docx              # Rapport modifiable
+├── data/
+│   ├── examples/
+│   │   ├── cycle5.txt                          # Cycle impair à 5 sommets
+│   │   ├── exam_schedule.txt                   # Matrice de 6 examens
+│   │   └── exam_schedule_labels.json           # Signification des sommets
+│   └── generated/exact/g20.txt                 # Graphe G20 déterministe suivi par Git
+├── deliverables/
+│   ├── presentation_coloriage_graphes.pptx     # Deck modifiable de 17 slides
+│   └── rapport_coloriage_graphes.pdf           # Rapport final
+├── results/
+│   ├── exact_selection.json                    # Instances exactes retenues aux mesures
+│   ├── figures/
+│   │   ├── arbre_backtracking_c5_k2.png         # Échec de 2-coloration sur C5
+│   │   ├── cycle5_colore.png                    # C5 colorié en 3 couleurs
+│   │   ├── efficacite_exact.png                 # Efficacité du backtracking
+│   │   ├── efficacite_greedy.png                # Efficacité du glouton
+│   │   ├── exam_schedule.png                    # Conflits et créneaux d'examens
+│   │   ├── gantt_2threads.png                  # Tâches feuilles, 2 threads
+│   │   ├── gantt_4threads.png                  # Tâches feuilles, 4 threads
+│   │   ├── gantt_openmp.png                    # Vue Gantt synthétique, 4 threads
+│   │   ├── speedup_exact.png                   # Accélération du backtracking
+│   │   ├── speedup_greedy.png                  # Accélération du glouton
+│   │   ├── taille_exact.png                    # Temps exact selon n
+│   │   ├── taille_greedy.png                   # Temps glouton selon n
+│   │   ├── temps_taille.png                   # Ancienne vue combinée des temps
+│   │   ├── temps_threads_exact.png             # Temps exact selon les threads
+│   │   └── temps_threads_greedy.png            # Temps glouton selon les threads
+│   ├── gantt.csv                               # Trace de référence
+│   ├── gantt_2threads.csv                      # Événements de la trace à 2 threads
+│   ├── gantt_4threads.csv                      # Événements de la trace à 4 threads
+│   ├── performance_summary.csv                # Moyennes, écarts-types, speedup et efficacité
+│   └── raw_measurements.csv                   # Mesures répétées brutes
+├── scripts/
+│   ├── artifact_deck.mjs                       # Source du deck Artifact
+│   ├── benchmark.py                            # Calibrage et mesures
+│   ├── build.ps1                               # Compilation Windows
+│   ├── create_report.py                        # Génération du DOCX
+│   ├── generate_graphs.py                      # Entrées déterministes
+│   ├── plot_results.mjs                        # Figures facultatives via sharp
+│   ├── plot_results.py                         # Figures Python à partir des CSV
+│   ├── run_all.ps1                             # Pipeline complet Windows
+│   └── set_pptx_metadata.py                    # Métadonnées PPTX
+├── src/
+│   └── coloring.c                              # Chargement, validation et quatre modes
+└── tests/
+    └── test_color.py                           # Vérifications de correction
+```
+
+Le graphe G20 est suivi par Git pour que la démo fonctionne sans génération préalable. Les autres entrées générées (G12, G16, G24, G30, G36 et les graphes gloutons) sont recréées par `scripts/generate_graphs.py` et ignorées par Git. `build/` contient le binaire compilé et `tmp/` sert aux fichiers temporaires locaux; ces répertoires ignorés ne sont pas des sources du dépôt.
+
+## Pipeline Windows
+
+scripts/run_all.ps1 automatise la compilation, les tests, la génération des graphes, la campagne complète, les traces Gantt et les figures. Il peut prendre plusieurs minutes. Depuis PowerShell :
+
+```powershell
+.\scripts\run_all.ps1
+```
+
+Pour un aperçu du raisonnement, une carte fonction par fonction, les charts expliqués, une répartition équitable de la soutenance et quinze Q&R, ouvrez GUIDE_SOUTENANCE_EQUIPE.md.
